@@ -1,0 +1,16 @@
+version: "3"
+
+services:
+  smap:
+    image: smap
+    build: .
+    container_name: smap
+    runtime: nvidia
+    tty: true
+    volumes:
+      - ~/.ros/RefineNet.pth:/ros/src/smap_ros/resources/RefineNet.pth
+      - ~/.ros/SMAP_model.pth:/ros/src/smap_ros/resources/SMAP_model.pth
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=all
+    network_mode: "host"
