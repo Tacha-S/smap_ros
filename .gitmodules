@@ -1,0 +1,3 @@
+[submodule "SMAP"]
+	path = SMAP
+	url = https://github.com/zju3dv/SMAP.git
