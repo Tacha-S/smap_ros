@@ -1,0 +1,12 @@
+<launch>
+  <arg name="color_image" default="/realsense_front/color/image_rect_color" />
+  <arg name="refinenet_model" default="$(find smap_ros)/resources/RefineNet.pth" />
+  <arg name="smap_model" default="$(find smap_ros)/resources/SMAP_model.pth" />
+
+  <node name="smap_pose" pkg="smap_ros" type="smap.py" respawn="true" output="screen">
+    <param name="refinenet_model" value="$(arg refinenet_model)" />
+    <param name="smap_model" value="$(arg smap_model)" />
+    <remap from="~input" to="$(arg color_image)" />
+  </node>
+
+</launch>
