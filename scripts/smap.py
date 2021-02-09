@@ -16,6 +16,7 @@ from cv_bridge import CvBridge, CvBridgeError
 from sensor_msgs.msg import Image
 
 sys.path.append("/ros/src/smap_ros/SMAP")
+os.environ['PROJECT_HOME'] = '/ros/src/smap_ros'
 
 import dapalib
 from exps.stage3_root2.config import cfg
@@ -23,6 +24,19 @@ from exps.stage3_root2.test_util import *
 from lib.utils.comm import is_main_process
 from model.refinenet import RefineNet
 from model.smap import SMAP
+
+
+def overray_result(pred_bodys_3d, img):
+    pairs = [[0, 1], [0, 2], [0, 9], [9, 10], [10, 11],
+             [0, 3], [3, 4], [4, 5], [2, 12], [12, 13],
+             [13, 14], [2, 6], [6, 7], [7, 8]]
+    colors = [(0, 0, 200), (0, 200, 0), (200, 0, 0), (0, 200, 200), (200, 200, 0), (200, 0, 200)]
+
+    for ip in range(len(pred_bodys_3d)):
+        p3d = pred_bodys_3d[ip]
+        for pair in pairs:
+            pts = np.array([p3d[pair, 0], p3d[pair, 1], p3d[pair, 2]], dtype=np.int32)
+            cv2.polylines(img, pts, False, colors[ip % len(colors)], 3)
 
 
 def generate_3d_point_pairs(model, refine_model, data_loader, cfg, device,
@@ -43,11 +57,8 @@ def generate_3d_point_pairs(model, refine_model, data_loader, cfg, device,
     kpt_num = cfg.DATASET.KEYPOINT.NUM
     data = tqdm(data_loader) if is_main_process() else data_loader
     for idx, batch in enumerate(data):
-        if cfg.TEST_MODE == 'run_inference':
-            imgs, img_path, scales = batch
-            meta_data = None
-        else:
-            imgs, meta_data, img_path, scales = batch
+        imgs, img_path, scales = batch
+        meta_data = None
         imgs = imgs.to(device)
         with torch.no_grad():
             outputs_2d, outputs_3d, outputs_rd = model(imgs)
@@ -142,17 +153,8 @@ def generate_3d_point_pairs(model, refine_model, data_loader, cfg, device,
                 else:
                     new_pred_bodys_3d = pred_bodys_3d
 
-                if cfg.TEST_MODE == "generate_train":
-                    save_result_for_train_refine(pred_bodys_2d, new_pred_bodys_3d, gt_bodys, pred_rdepths, result)
-                else:
-                    save_result(pred_bodys_2d, new_pred_bodys_3d, gt_bodys, pred_rdepths, img_path[i], result)
-
-    dir_name = os.path.split(os.path.split(os.path.realpath(__file__))[0])[1]
-    pair_file_name = os.path.join(output_dir, '{}_{}_{}_{}.json'.format(dir_name, cfg.TEST_MODE,
-                                                                        cfg.DATA_MODE, cfg.JSON_SUFFIX_NAME))
-    with open(pair_file_name, 'w') as f:
-        json.dump(result, f)
-    rospy.loginfo("Pairs writed to {}".format(pair_file_name))
+                overray_result(new_pred_bodys_3d, imgs[i])
+                return imgs[i]
 
 
 class Dataset(object):
@@ -248,7 +250,7 @@ class PoseEstimation(object):
         test_dataset = Dataset(image_rgb)
         data_loader = DataLoader(test_dataset, batch_size=16, shuffle=False)
 
-        generate_3d_point_pairs(self.model, self.refine_model, data_loader, cfg, self.device,
+        image_debug = generate_3d_point_pairs(self.model, self.refine_model, data_loader, cfg, self.device,
                                 output_dir=os.path.join(cfg.OUTPUT_DIR, "result"))
 
         total_then = time.time()
